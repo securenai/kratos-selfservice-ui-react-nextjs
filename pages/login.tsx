@@ -86,24 +86,27 @@ const Login: NextPage = () => {
           }
 
           console.log("[@OAuth2.0 flow] oryLoginFlow", oryLoginFlow)
+          if (oryLoginFlow.status === 200) {
+            // fetch extra data about the login challenge
+            const oauth2LoginData = await fetchData(
+              `/api/hydra/oauth2/getLogin`,
+            )
+            console.log("[@OAuth2.0 flow] oauth2LoginData:", oauth2LoginData)
+            // post to hydra accept the login challenge after authenticating
+            const acceptLoginChallenge = await postData(
+              `/api/hydra/oauth2/acceptLogin`,
+              { subject: "test" },
+              { type: request_type.POST },
+            )
+            console.log(
+              "[@OAuth2.0 flow] acceptLoginChallenge:",
+              acceptLoginChallenge,
+            )
 
-          // fetch extra data about the login challenge
-          const oauth2LoginData = await fetchData(`/api/hydra/oauth2/getLogin`)
-          console.log("[@OAuth2.0 flow] oauth2LoginData:", oauth2LoginData)
-          // post to hydra accept the login challenge after authenticating
-          const acceptLoginChallenge = await postData(
-            `/api/hydra/oauth2/acceptLogin`,
-            { subject: "test" },
-            { type: request_type.POST },
-          )
-          console.log(
-            "[@OAuth2.0 flow] acceptLoginChallenge:",
-            acceptLoginChallenge,
-          )
+            // redirect to next flow
 
-          // redirect to next flow
-
-          router.push(acceptLoginChallenge?.data?.redirect_to)
+            router.push(acceptLoginChallenge?.data?.redirect_to)
+          }
         } catch (err: AxiosError) {
           if (err.response?.status === 400) {
             console.log(
