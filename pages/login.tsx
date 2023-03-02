@@ -95,6 +95,7 @@ const Login: NextPage = () => {
       .then((res) => {
         console.log("[@] POST hydra/login response", response)
         // login response was successful re-route to consent-page
+console.log("🚀 ~ file: login.tsx:101 ~ .then ~ res.data?.redirect_to:", res.data?.redirect_to)
         if (res.status === 200) {
           // redirect with challenge:
           router.push(res.data?.redirect_to)

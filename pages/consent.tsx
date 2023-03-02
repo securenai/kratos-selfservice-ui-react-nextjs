@@ -15,6 +15,7 @@ const Consent: NextPage = () => {
     const response = await api.post("/api/hydra/consent", {
       consent_challenge,
     })
+console.log("🚀 ~ file: consent.tsx:18 ~ handleSubmit ~ response.data:", response.data)
 
     // if consent call status passed
     if (response.status === 200) {
