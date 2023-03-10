@@ -11,6 +11,38 @@ import { api } from "../axios/api"
 import { ActionCard, CenterLink, LogoutLink, Flow, MarginCard } from "../pkg"
 import { handleGetFlowError, handleFlowError } from "../pkg/errors"
 import ory from "../pkg/sdk"
+import * as yup from 'yup';
+import cloneDeep from 'lodash/cloneDeep';
+
+export const handleYupSchema = async (schema, payload) =>
+  schema.validate(payload, { abortEarly: false });
+
+export const handleYupErrors = errors => {
+  if(!errors.inner) return errors;
+
+  console.log("🚀 ~ file: login.tsx:21 ~ handleYupErrors ~ errors:", errors)
+  return errors.inner.reduce((currentError, nextError) => {
+    const name = nextError.path;
+    const message = nextError.message;
+    return {
+      ...currentError,
+      [name]: message
+    }
+  }, {})
+}
+
+export const passwordSchema = yup
+  .string()
+  .matches(
+    /^(?=.{8,20}$)([a-zA-Z]+\d+|\d+[a-zA-Z]+)\w*$/,
+    '請設置8至20碼英數組合'
+  )
+  .required('密碼不可為空');
+
+const loginFormSchema = yup.object({
+  identifier: yup.string().email().required('信箱不可為空'),
+  password: passwordSchema,
+});
 
 const Login: NextPage = () => {
   const [flow, setFlow] = useState<LoginFlow>()
@@ -116,15 +148,55 @@ console.log("🚀 ~ file: login.tsx:101 ~ .then ~ res.data?.redirect_to:", res.d
       console.log("values", values.identifier)
       subject = values.identifier
     }
-    return (
-      // original Kratos flow - not needed anymore since we don't need use router to push to the url with flow id
-      // router
-      //   // On submission, add the flow ID to the URL but do not navigate. This prevents the user loosing
-      //   // his data when she/he reloads the page.
-      //   // .push(`/login?flow=${flow?.id}`, undefined, { shallow: true })
-      //   .push("/login")
-      //   .then(() =>
 
+    try {
+      await handleYupSchema(loginFormSchema, values);
+      
+      await ory
+      .updateLoginFlow({
+        flow: String(flow?.id),
+        updateLoginFlowBody: values,
+      });
+
+      if (login_challenge) {
+        doConsentProcess(login_challenge as string, subject)
+      } else {
+        // Original Kratos flow
+        if (flow?.return_to) {
+          window.location.href = flow?.return_to
+          return
+        }
+        router.push("/")
+      }
+      return true;
+    } catch (error) {
+      const errors = handleYupErrors(error);
+      const nextFlow = cloneDeep(flow);
+      if (errors.identifier) {
+        const message = {
+          id:  4000002,
+          text: errors.identifier,
+          type: 'error',
+        };
+        const identifierIndex = nextFlow.ui.nodes.findIndex(node => node.attributes.name === 'identifier')
+        nextFlow.ui.nodes[identifierIndex].messages = [message];
+      }
+
+      if (errors.password) {
+        const passwordMessage = {
+          id:  4000002,
+          text: errors.password,
+          type: 'error',
+        };
+        const passwordIndex = nextFlow.ui.nodes.findIndex(node => node.attributes.name === 'password')
+        nextFlow.ui.nodes[passwordIndex].messages = [passwordMessage];
+      }
+      setFlow(nextFlow);
+      // setErrors(errors);
+      return false;
+    }
+
+    return (
       ory
         .updateLoginFlow({
           flow: String(flow?.id),
@@ -155,6 +227,7 @@ console.log("🚀 ~ file: login.tsx:101 ~ .then ~ res.data?.redirect_to:", res.d
           if (err.response?.status === 400) {
             // Yup, it is!
             if (err && err.response) {
+              console.log("🚀 ~ file: login.tsx:161 ~ onSubmit ~ err.response?.data:", err.response?.data)
               setFlow(err.response?.data)
             }
             return
