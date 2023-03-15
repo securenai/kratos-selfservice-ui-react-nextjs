@@ -69,8 +69,6 @@ export function handleGetFlowError<S>(
         return
     }
 
-    console.log("reached the end")
-
     // original Kratos handling flow expiry
     // switch (err.response?.status) {
     //   case 410:

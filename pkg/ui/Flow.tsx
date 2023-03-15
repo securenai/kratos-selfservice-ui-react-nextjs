@@ -76,7 +76,6 @@ export class Flow<T extends Values> extends Component<Props<T>, State<T>> {
   }
 
   componentDidMount() {
-    console.log(this.filterNodes())
     this.initializeValues(this.filterNodes())
   }
 
@@ -176,7 +175,6 @@ export class Flow<T extends Values> extends Component<Props<T>, State<T>> {
         {nodes.map((node, k) => {
           // console.log(node)
           const id = getNodeId(node) as keyof Values
-          console.log("node:", node)
           // if (this.props.noEmail && node.meta.label?.text === "E-Mail") return
           // if (node.meta.label?.text === "E-Mail") return
 

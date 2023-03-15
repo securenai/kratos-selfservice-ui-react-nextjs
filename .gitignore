@@ -39,3 +39,5 @@ dist/
 cypress/videos
 cypress/screenshots
 
+# yaml
+identity-config.yaml

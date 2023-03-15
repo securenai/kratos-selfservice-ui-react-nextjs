@@ -15,9 +15,9 @@ interface ResponseType {
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === "GET") {
-    // console.log('1', req.url);
+    console.log('1', req.url);
     const query = url.parse(req.url ? req.url : '', true).query
-    // console.log('2', query);
+    console.log('2', query);
     // The challenge is used to fetch information about the login request from ORY Hydra.
     const challenge = String(query.login_challenge)
     const subject = req.body.subject
@@ -38,6 +38,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         .then(async ({ data: body }) => {
           // If hydra was already able to authenticate the user, skip will be true and we do not need to re-authenticate
           // the user.
+	  console.log("🚀 ~ file: login.ts:40 ~ .then ~ body:", body)
           if (body.skip) {
             // 2) authorize the very last step via hydra if skip was true
             return hydraAdmin

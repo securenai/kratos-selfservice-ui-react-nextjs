@@ -6,11 +6,13 @@ import Head from "next/head"
 import Link from "next/link"
 import { useRouter } from "next/router"
 import { useEffect, useState } from "react"
-
+import cloneDeep from 'lodash/cloneDeep';
 import { api } from "../axios/api"
 import { ActionCard, CenterLink, LogoutLink, Flow, MarginCard } from "../pkg"
 import { handleGetFlowError, handleFlowError } from "../pkg/errors"
 import ory from "../pkg/sdk"
+import {loginFormSchema} from '../util/schemas';
+import {handleYupSchema, handleYupErrors} from '../util/yupHelpers';
 
 const Login: NextPage = () => {
   const [flow, setFlow] = useState<LoginFlow>()
@@ -93,7 +95,6 @@ const Login: NextPage = () => {
         subject,
       })
       .then((res) => {
-        console.log("[@] POST hydra/login response", response)
         // login response was successful re-route to consent-page
         if (res.status === 200) {
           // redirect with challenge:
@@ -112,55 +113,81 @@ const Login: NextPage = () => {
     // TODO - this is temp method to add subject, need to get subject from account
     let subject = ""
     if (values?.identifier) {
-      console.log("values", values.identifier)
       subject = values.identifier
     }
-    return (
-      // original Kratos flow - not needed anymore since we don't need use router to push to the url with flow id
-      // router
-      //   // On submission, add the flow ID to the URL but do not navigate. This prevents the user loosing
-      //   // his data when she/he reloads the page.
-      //   // .push(`/login?flow=${flow?.id}`, undefined, { shallow: true })
-      //   .push("/login")
-      //   .then(() =>
 
-      ory
-        .updateLoginFlow({
-          flow: String(flow?.id),
-          updateLoginFlowBody: values,
-        })
-
-        // We logged in successfully! Let's bring the user home.
-        .then((data) => {
-          // new flow
-          if (login_challenge) {
-            doConsentProcess(login_challenge as string, subject)
-          } else {
-            // Original Kratos flow
-            // console.log("data", data)
-            // console.log("flow", flow)
-            if (flow?.return_to) {
-              window.location.href = flow?.return_to
+    try {
+      if (!values.provider) {
+        await handleYupSchema(loginFormSchema, values);
+      }
+      
+      return (
+        ory
+          .updateLoginFlow({
+            flow: String(flow?.id),
+            updateLoginFlowBody: values,
+          })
+  
+          // We logged in successfully! Let's bring the user home.
+          .then((data) => {
+            // new flow
+            if (login_challenge) {
+              doConsentProcess(login_challenge as string, subject)
+            } else {
+              // Original Kratos flow
+              // console.log("data", data)
+              // console.log("flow", flow)
+              if (flow?.return_to) {
+                window.location.href = flow?.return_to
+                return
+              }
+              router.push("/")
+            }
+          })
+          .then(() => {})
+          .catch(handleFlowError(router, "login", setFlow))
+          .catch((err: any) => {
+            // If the previous handler did not catch the error it's most likely a form validation error
+            console.log("handleFlowError errored with:", err)
+            if (err.response?.status === 400) {
+              // Yup, it is!
+              if (err && err.response) {
+                console.log("🚀 ~ file: login.tsx:161 ~ onSubmit ~ err.response?.data:", err.response?.data)
+                setFlow(err.response?.data)
+              }
               return
             }
-            router.push("/")
-          }
-        })
-        .then(() => {})
-        .catch(handleFlowError(router, "login", setFlow))
-        .catch((err: any) => {
-          // If the previous handler did not catch the error it's most likely a form validation error
-          console.log("handleFlowError errored with:", err)
-          if (err.response?.status === 400) {
-            // Yup, it is!
-            if (err && err.response) {
-              setFlow(err.response?.data)
-            }
-            return
-          }
-          return Promise.reject(err)
-        })
-    )
+            return Promise.reject(err)
+          })
+      )
+    } catch (error) {
+      const errors = handleYupErrors(error);
+      const nextFlow = cloneDeep(flow);
+      if (errors.identifier) {
+        const message = {
+          id:  4000002,
+          text: errors.identifier,
+          type: 'error',
+        };
+        const identifierIndex = nextFlow.ui.nodes.findIndex(node => node.attributes.name === 'identifier')
+        nextFlow.ui.nodes[identifierIndex].messages = [message];
+      }
+
+      if (errors.password) {
+        const passwordMessage = {
+          id:  4000002,
+          text: errors.password,
+          type: 'error',
+        };
+        const passwordIndex = nextFlow.ui.nodes.findIndex(node => node.attributes.name === 'password')
+        nextFlow.ui.nodes[passwordIndex].messages = [passwordMessage];
+      }
+      setFlow(nextFlow);
+      // setErrors(errors);
+      return false;
+    }
+
+    
   }
 
   return (
