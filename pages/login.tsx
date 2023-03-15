@@ -6,7 +6,7 @@ import Head from "next/head"
 import Link from "next/link"
 import { useRouter } from "next/router"
 import { useEffect, useState } from "react"
-
+import cloneDeep from 'lodash/cloneDeep';
 import { api } from "../axios/api"
 import { ActionCard, CenterLink, LogoutLink, Flow, MarginCard } from "../pkg"
 import { handleGetFlowError, handleFlowError } from "../pkg/errors"
@@ -95,9 +95,7 @@ const Login: NextPage = () => {
         subject,
       })
       .then((res) => {
-        console.log("[@] POST hydra/login response", response)
         // login response was successful re-route to consent-page
-console.log("🚀 ~ file: login.tsx:101 ~ .then ~ res.data?.redirect_to:", res.data?.redirect_to)
         if (res.status === 200) {
           // redirect with challenge:
           router.push(res.data?.redirect_to)
@@ -115,30 +113,53 @@ console.log("🚀 ~ file: login.tsx:101 ~ .then ~ res.data?.redirect_to:", res.d
     // TODO - this is temp method to add subject, need to get subject from account
     let subject = ""
     if (values?.identifier) {
-      console.log("values", values.identifier)
       subject = values.identifier
     }
 
     try {
-      await handleYupSchema(loginFormSchema, values);
-      
-      await ory
-      .updateLoginFlow({
-        flow: String(flow?.id),
-        updateLoginFlowBody: values,
-      });
-
-      if (login_challenge) {
-        doConsentProcess(login_challenge as string, subject)
-      } else {
-        // Original Kratos flow
-        if (flow?.return_to) {
-          window.location.href = flow?.return_to
-          return
-        }
-        router.push("/")
+      if (!values.provider) {
+        await handleYupSchema(loginFormSchema, values);
       }
-      return true;
+      
+      return (
+        ory
+          .updateLoginFlow({
+            flow: String(flow?.id),
+            updateLoginFlowBody: values,
+          })
+  
+          // We logged in successfully! Let's bring the user home.
+          .then((data) => {
+            // new flow
+            if (login_challenge) {
+              doConsentProcess(login_challenge as string, subject)
+            } else {
+              // Original Kratos flow
+              // console.log("data", data)
+              // console.log("flow", flow)
+              if (flow?.return_to) {
+                window.location.href = flow?.return_to
+                return
+              }
+              router.push("/")
+            }
+          })
+          .then(() => {})
+          .catch(handleFlowError(router, "login", setFlow))
+          .catch((err: any) => {
+            // If the previous handler did not catch the error it's most likely a form validation error
+            console.log("handleFlowError errored with:", err)
+            if (err.response?.status === 400) {
+              // Yup, it is!
+              if (err && err.response) {
+                console.log("🚀 ~ file: login.tsx:161 ~ onSubmit ~ err.response?.data:", err.response?.data)
+                setFlow(err.response?.data)
+              }
+              return
+            }
+            return Promise.reject(err)
+          })
+      )
     } catch (error) {
       const errors = handleYupErrors(error);
       const nextFlow = cloneDeep(flow);
@@ -166,45 +187,7 @@ console.log("🚀 ~ file: login.tsx:101 ~ .then ~ res.data?.redirect_to:", res.d
       return false;
     }
 
-    return (
-      ory
-        .updateLoginFlow({
-          flow: String(flow?.id),
-          updateLoginFlowBody: values,
-        })
-
-        // We logged in successfully! Let's bring the user home.
-        .then((data) => {
-          // new flow
-          if (login_challenge) {
-            doConsentProcess(login_challenge as string, subject)
-          } else {
-            // Original Kratos flow
-            // console.log("data", data)
-            // console.log("flow", flow)
-            if (flow?.return_to) {
-              window.location.href = flow?.return_to
-              return
-            }
-            router.push("/")
-          }
-        })
-        .then(() => {})
-        .catch(handleFlowError(router, "login", setFlow))
-        .catch((err: any) => {
-          // If the previous handler did not catch the error it's most likely a form validation error
-          console.log("handleFlowError errored with:", err)
-          if (err.response?.status === 400) {
-            // Yup, it is!
-            if (err && err.response) {
-              console.log("🚀 ~ file: login.tsx:161 ~ onSubmit ~ err.response?.data:", err.response?.data)
-              setFlow(err.response?.data)
-            }
-            return
-          }
-          return Promise.reject(err)
-        })
-    )
+    
   }
 
   return (
