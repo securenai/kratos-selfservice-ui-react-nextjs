@@ -11,38 +11,8 @@ import { api } from "../axios/api"
 import { ActionCard, CenterLink, LogoutLink, Flow, MarginCard } from "../pkg"
 import { handleGetFlowError, handleFlowError } from "../pkg/errors"
 import ory from "../pkg/sdk"
-import * as yup from 'yup';
-import cloneDeep from 'lodash/cloneDeep';
-
-export const handleYupSchema = async (schema, payload) =>
-  schema.validate(payload, { abortEarly: false });
-
-export const handleYupErrors = errors => {
-  if(!errors.inner) return errors;
-
-  console.log("🚀 ~ file: login.tsx:21 ~ handleYupErrors ~ errors:", errors)
-  return errors.inner.reduce((currentError, nextError) => {
-    const name = nextError.path;
-    const message = nextError.message;
-    return {
-      ...currentError,
-      [name]: message
-    }
-  }, {})
-}
-
-export const passwordSchema = yup
-  .string()
-  .matches(
-    /^(?=.{8,20}$)([a-zA-Z]+\d+|\d+[a-zA-Z]+)\w*$/,
-    '請設置8至20碼英數組合'
-  )
-  .required('密碼不可為空');
-
-const loginFormSchema = yup.object({
-  identifier: yup.string().email().required('信箱不可為空'),
-  password: passwordSchema,
-});
+import {loginFormSchema} from '../util/schemas';
+import {handleYupSchema, handleYupErrors} from '../util/yupHelpers';
 
 const Login: NextPage = () => {
   const [flow, setFlow] = useState<LoginFlow>()
